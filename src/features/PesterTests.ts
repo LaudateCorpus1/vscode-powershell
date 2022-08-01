@@ -91,11 +91,7 @@ export class PesterTestsFeature implements vscode.Disposable {
             ],
             internalConsoleOptions: "neverOpen",
             noDebug: (launchType === LaunchType.Run),
-            createTemporaryIntegratedConsole: settings.debugging.createTemporaryIntegratedConsole,
-            cwd:
-                currentDocument.isUntitled
-                    ? vscode.workspace.rootPath
-                    : path.dirname(currentDocument.fileName),
+            createTemporaryIntegratedConsole: settings.debugging.createTemporaryIntegratedConsole
         };
 
         if (lineNum) {
@@ -132,12 +128,7 @@ export class PesterTestsFeature implements vscode.Disposable {
     private async launch(launchConfig): Promise<boolean> {
         // Create or show the interactive console
         // TODO: #367 Check if "newSession" mode is configured
-        vscode.commands.executeCommand("PowerShell.ShowSessionConsole", true);
-
-        // Write out temporary debug session file
-        utils.writeSessionFile(
-            utils.getDebugSessionFilePath(),
-            this.sessionManager.getSessionDetails());
+        await vscode.commands.executeCommand("PowerShell.ShowSessionConsole", true);
 
         // TODO: Update to handle multiple root workspaces.
         //

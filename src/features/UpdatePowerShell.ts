@@ -149,7 +149,7 @@ export async function InvokePowerShellUpdateCheck(
                     await streamPipeline(res.body, fs.createWriteStream(msiDownloadPath));
                 });
 
-                // Stop the Integrated Console session because Windows likes to hold on to files.
+                // Stop the session because Windows likes to hold on to files.
                 sessionManager.stop();
 
                 // Close all terminals with the name "pwsh" in the current VS Code session.
@@ -164,9 +164,9 @@ export async function InvokePowerShellUpdateCheck(
                 // Invoke the MSI via cmd.
                 const msi = spawn("msiexec", ["/i", msiDownloadPath]);
 
-                msi.on("close", (code) => {
-                    // Now that the MSI is finished, start the Integrated Console session.
-                    sessionManager.start();
+                msi.on("close", async () => {
+                    // Now that the MSI is finished, restart the session.
+                    await sessionManager.start();
                     fs.unlinkSync(msiDownloadPath);
                 });
 

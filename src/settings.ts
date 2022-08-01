@@ -5,6 +5,7 @@
 
 import vscode = require("vscode");
 import utils = require("./utils");
+import os = require("os");
 
 enum CodeFormattingPreset {
     Custom,
@@ -27,8 +28,7 @@ export enum CommentType {
 }
 
 export interface IPowerShellAdditionalExePathSettings {
-    versionName: string;
-    exePath: string;
+    [versionName: string]: string;
 }
 
 export interface IBugReportingSettings {
@@ -79,16 +79,14 @@ export interface IDeveloperSettings {
 }
 
 export interface ISettings {
-    powerShellAdditionalExePaths?: IPowerShellAdditionalExePathSettings[];
+    powerShellAdditionalExePaths?: IPowerShellAdditionalExePathSettings;
     powerShellDefaultVersion?: string;
     // This setting is no longer used but is here to assist in cleaning up the users settings.
     powerShellExePath?: string;
     promptToUpdatePowerShell?: boolean;
-    promptToUpdatePackageManagement?: boolean;
     bundledModulesPath?: string;
     startAsLoginShell?: IStartAsLoginShellSettings;
     startAutomatically?: boolean;
-    useX86Host?: boolean;
     enableProfileLoading?: boolean;
     helpCompletion: string;
     scriptAnalysis?: IScriptAnalysisSettings;
@@ -137,10 +135,10 @@ export interface INotebooksSettings {
     saveMarkdownCellsAs?: CommentType;
 }
 
+// TODO: This could probably be async, and call `validateCwdSetting()` directly.
 export function load(): ISettings {
     const configuration: vscode.WorkspaceConfiguration =
-        vscode.workspace.getConfiguration(
-            utils.PowerShellLanguageId);
+        vscode.workspace.getConfiguration(utils.PowerShellLanguageId);
 
     const defaultBugReportingSettings: IBugReportingSettings = {
         project: "https://github.com/PowerShell/vscode-powershell",
@@ -226,19 +224,15 @@ export function load(): ISettings {
         startAutomatically:
             configuration.get<boolean>("startAutomatically", true),
         powerShellAdditionalExePaths:
-            configuration.get<IPowerShellAdditionalExePathSettings[]>("powerShellAdditionalExePaths", undefined),
+            configuration.get<IPowerShellAdditionalExePathSettings>("powerShellAdditionalExePaths", undefined),
         powerShellDefaultVersion:
             configuration.get<string>("powerShellDefaultVersion", undefined),
         powerShellExePath:
             configuration.get<string>("powerShellExePath", undefined),
         promptToUpdatePowerShell:
             configuration.get<boolean>("promptToUpdatePowerShell", true),
-        promptToUpdatePackageManagement:
-            configuration.get<boolean>("promptToUpdatePackageManagement", true),
         bundledModulesPath:
             "../modules", // Because the extension is always at `<root>/out/main.js`
-        useX86Host:
-            configuration.get<boolean>("useX86Host", false),
         enableProfileLoading:
             configuration.get<boolean>("enableProfileLoading", false),
         helpCompletion:
@@ -272,17 +266,17 @@ export function load(): ISettings {
             //   is the reason terminals on macOS typically run login shells by default which set up
             //   the environment. See http://unix.stackexchange.com/a/119675/115410"
             configuration.get<IStartAsLoginShellSettings>("startAsLoginShell", defaultStartAsLoginShellSettings),
-        cwd:
-            configuration.get<string>("cwd", null),
+        cwd: // NOTE: This must be validated at startup via `validateCwdSetting()`. There's probably a better way to do this.
+            configuration.get<string>("cwd", undefined),
     };
 }
 
 // Get the ConfigurationTarget (read: scope) of where the *effective* setting value comes from
 export async function getEffectiveConfigurationTarget(settingName: string): Promise<vscode.ConfigurationTarget> {
     const configuration = vscode.workspace.getConfiguration(utils.PowerShellLanguageId);
-
     const detail = configuration.inspect(settingName);
     let configurationTarget = null;
+
     if (typeof detail.workspaceFolderValue !== "undefined") {
         configurationTarget = vscode.ConfigurationTarget.WorkspaceFolder;
     }
@@ -301,7 +295,6 @@ export async function change(
     configurationTarget?: vscode.ConfigurationTarget | boolean): Promise<void> {
 
     const configuration = vscode.workspace.getConfiguration(utils.PowerShellLanguageId);
-
     await configuration.update(settingName, newValue, configurationTarget);
 }
 
@@ -318,4 +311,31 @@ function getWorkspaceSettingsWithDefaults<TSettings>(
         }
     }
     return defaultSettings;
+}
+
+export async function validateCwdSetting(): Promise<string> {
+    let cwd: string = vscode.workspace.getConfiguration(utils.PowerShellLanguageId).get<string>("cwd", null);
+
+    // Only use the cwd setting if it exists.
+    if (utils.checkIfDirectoryExists(cwd)) {
+        return cwd;
+    } else {
+        // Otherwise use a workspace folder, prompting if necessary.
+        if (vscode.workspace.workspaceFolders?.length > 1) {
+            const options: vscode.WorkspaceFolderPickOptions = {
+                placeHolder: "Select a folder to use as the PowerShell extension's working directory.",
+            }
+            cwd = (await vscode.window.showWorkspaceFolderPick(options))?.uri.fsPath;
+            // Save the picked 'cwd' to the workspace settings.
+            await change("cwd", cwd);
+        } else {
+            cwd = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+        }
+        // If there were no workspace folders, or somehow they don't exist, use
+        // the home directory.
+        if (cwd === undefined || !utils.checkIfDirectoryExists(cwd)) {
+            return os.homedir();
+        }
+        return cwd;
+    }
 }

@@ -1,6 +1,6 @@
 # PowerShell Language Support for Visual Studio Code
 
-[![Build Status](https://dev.azure.com/powershell/vscode-powershell/_apis/build/status/PowerShell.vscode-powershell?branchName=master)](https://dev.azure.com/powershell/vscode-powershell/_build/latest?definitionId=51&branchName=master)
+[![Build Status](https://dev.azure.com/powershell/vscode-powershell/_apis/build/status/PowerShell.vscode-powershell?branchName=main)](https://dev.azure.com/powershell/vscode-powershell/_build/latest?definitionId=51&branchName=main)
 [![Version](https://vsmarketplacebadge.apphb.com/version/ms-vscode.PowerShell.svg)](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell)
 [![Installs](https://vsmarketplacebadge.apphb.com/installs-short/ms-vscode.PowerShell.svg)](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell)
 [![Discord](https://img.shields.io/discord/180528040881815552.svg?label=%23vscode&logo=discord&logoColor=white)](https://aka.ms/powershell-vscode-discord)
@@ -28,11 +28,12 @@ The extension _should_ work anywhere VS Code itself and PowerShell Core 7 or hig
 PowerShell Core 6 is end-of-life and so not supported. Our test matrix includes the
 following:
 
-- **Windows Server 2019** with Windows PowerShell 5.1 and PowerShell Core 7.1.5
-- **macOS 10.15** with PowerShell Core 7.1.5
-- **Ubuntu 20.04** with PowerShell Core 7.1.5
+- **Windows Server 2022** with Windows PowerShell 5.1 and PowerShell Core 7.2.5
+- **Windows Server 2019** with Windows PowerShell 5.1 and PowerShell Core 7.2.5
+- **macOS 11** with PowerShell Core 7.2.5
+- **Ubuntu 20.04** with PowerShell Core 7.2.5
 
-[supported]: https://docs.microsoft.com/en-us/powershell/scripting/powershell-support-lifecycle?view=powershell-7.1#supported-platforms
+[supported]: https://docs.microsoft.com/en-us/powershell/scripting/powershell-support-lifecycle
 
 Read the [installation instructions](https://docs.microsoft.com/en-us/powershell/scripting/components/vscode/using-vscode)
 to get more details on how to use the extension on these platforms.
@@ -51,7 +52,7 @@ to get more details on how to use the extension on these platforms.
 - Run selected selection of PowerShell code using <kbd>F8</kbd>
 - Launch online help for the symbol under the cursor using <kbd>Ctrl</kbd>+<kbd>F1</kbd>
 - Local script debugging
-- Integrated console support
+- Extension Terminal support
 - PowerShell ISE color theme
 
 ## Installing the Extension
@@ -61,7 +62,7 @@ in the [Visual Studio Code documentation](https://code.visualstudio.com/docs/edi
 In the Extensions pane, search for "PowerShell" extension and install it there. You will
 get notified automatically about any future extension updates!
 
-You can also install a VSIX package from our [Releases page](https://github.com/PowerShell/vscode-powershell/releases) by following the
+You can also install a VSIX package from our [releases page](https://github.com/PowerShell/vscode-powershell/releases) by following the
 [Install from a VSIX](https://code.visualstudio.com/docs/editor/extension-gallery#_install-from-a-vsix)
 instructions. The easiest way is through the command line:
 
@@ -86,11 +87,11 @@ the `Install-Script` command.
 
 **Alternatively** you can download and execute the script directly from the web
 without the use of `Install-Script`.  However we **highly recommend** that you
-[read the script](https://raw.githubusercontent.com/PowerShell/vscode-powershell/master/scripts/Install-VSCode.ps1)
+[read the script](https://raw.githubusercontent.com/PowerShell/vscode-powershell/main/scripts/Install-VSCode.ps1)
 first before running it in this way!
 
 ```powershell
-iex (iwr https://raw.githubusercontent.com/PowerShell/vscode-powershell/master/scripts/Install-VSCode.ps1)
+iex (iwr https://raw.githubusercontent.com/PowerShell/vscode-powershell/main/scripts/Install-VSCode.ps1)
 ```
 
 ## Reporting Problems
@@ -101,7 +102,7 @@ on diagnosing and reporting issues.
 
 ## Security Note
 
-For any security issues, please see [here](./docs/troubleshooting.md#note-on-security).
+For any security issues, please see [here](./SECURITY.md).
 
 ## Example Scripts
 
@@ -130,7 +131,6 @@ on how to contribute to this extension!
 
 ## Maintainers
 
-- Rob Holt - [@rjmholt](https://github.com/rjmholt)
 - Patrick Meinecke - [@SeeminglyScience](https://github.com/SeeminglyScience)
 - Andy Schwartzmeyer - [@andschwa](https://github.com/andschwa)
 - Sydney Smith - [@SydneyhSmith](https://github.com/SydneyhSmith)
@@ -138,6 +138,7 @@ on how to contribute to this extension!
 ### Emeriti
 
 - Keith Hill - [@rkeithhill](https://github.com/rkeithhill)
+- Rob Holt - [@rjmholt](https://github.com/rjmholt)
 - Tyler Leonhardt - [@TylerLeonhardt](https://github.com/TylerLeonhardt)
 - David Wilson - [@daviwil](https://github.com/daviwil)
 
@@ -155,4 +156,4 @@ For more information see the [Code of Conduct FAQ][conduct-FAQ] or contact [open
 [conduct-code]: http://opensource.microsoft.com/codeofconduct/
 [conduct-FAQ]: http://opensource.microsoft.com/codeofconduct/faq/
 [conduct-email]: mailto:opencode@microsoft.com
-[conduct-md]: https://github.com/PowerShell/vscode-powershell/blob/master/CODE_OF_CONDUCT.md
+[conduct-md]: https://github.com/PowerShell/vscode-powershell/blob/main/CODE_OF_CONDUCT.md

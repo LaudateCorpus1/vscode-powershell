@@ -5,7 +5,7 @@
 
 import path = require("path");
 import vscode = require("vscode");
-import TelemetryReporter from "vscode-extension-telemetry";
+import TelemetryReporter from "@vscode/extension-telemetry";
 import { DocumentSelector } from "vscode-languageclient";
 import { CodeActionsFeature } from "./features/CodeActions";
 import { ConsoleFeature } from "./features/Console";
@@ -52,18 +52,24 @@ const documentSelector: DocumentSelector = [
     { language: "powershell", scheme: "untitled" },
 ];
 
-export function activate(context: vscode.ExtensionContext): IPowerShellExtensionClient {
-    // create telemetry reporter on extension activation
+// NOTE: Now that this is async, we can probably improve a lot!
+export async function activate(context: vscode.ExtensionContext): Promise<IPowerShellExtensionClient> {
     telemetryReporter = new TelemetryReporter(PackageJSON.name, PackageJSON.version, AI_KEY);
 
-    // If both extensions are enabled, this will cause unexpected behavior since both register the same commands
+    // If both extensions are enabled, this will cause unexpected behavior since both register the same commands.
+    // TODO: Merge extensions and use preview channel in marketplace instead.
     if (PackageJSON.name.toLowerCase() === "powershell-preview"
         && vscode.extensions.getExtension("ms-vscode.powershell")) {
         vscode.window.showWarningMessage(
             "'PowerShell' and 'PowerShell Preview' are both enabled. Please disable one for best performance.");
     }
 
+    // This displays a popup and a changelog after an update.
     checkForUpdatedVersion(context, PackageJSON.version);
+
+    // Load and validate settings (will prompt for 'cwd' if necessary).
+    await Settings.validateCwdSetting();
+    const extensionSettings = Settings.load();
 
     vscode.languages.setLanguageConfiguration(
         PowerShellLanguageId,
@@ -118,15 +124,13 @@ export function activate(context: vscode.ExtensionContext): IPowerShellExtension
             ],
         });
 
-    // Create the logger
-    logger = new Logger();
-
-    // Set the log level
-    const extensionSettings = Settings.load();
+    // Setup the logger.
+    logger = new Logger(context.globalStorageUri);
     logger.MinimumLogLevel = LogLevel[extensionSettings.developer.editorServicesLogLevel];
 
     sessionManager =
         new SessionManager(
+            context,
             logger,
             documentSelector,
             PackageJSON.displayName,
@@ -145,7 +149,7 @@ export function activate(context: vscode.ExtensionContext): IPowerShellExtension
         new SpecifyScriptArgsFeature(context),
     ]
 
-    const externalApi = new ExternalApiFeature(sessionManager, logger);
+    const externalApi = new ExternalApiFeature(context, sessionManager, logger);
 
     // Features and command registrations that require language client
     languageClientConsumers = [
@@ -168,7 +172,7 @@ export function activate(context: vscode.ExtensionContext): IPowerShellExtension
     sessionManager.setLanguageClientConsumers(languageClientConsumers);
 
     if (extensionSettings.startAutomatically) {
-        sessionManager.start();
+        await sessionManager.start();
     }
 
     return {
@@ -176,6 +180,7 @@ export function activate(context: vscode.ExtensionContext): IPowerShellExtension
         unregisterExternalExtension: uuid => externalApi.unregisterExternalExtension(uuid),
         getPowerShellVersionDetails: uuid => externalApi.getPowerShellVersionDetails(uuid),
         waitUntilStarted: uuid => externalApi.waitUntilStarted(uuid),
+        getStorageUri: () => externalApi.getStorageUri(),
     };
 }
 

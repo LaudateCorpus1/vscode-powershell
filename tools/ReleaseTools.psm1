@@ -62,9 +62,10 @@ function Get-Bullets {
             'andschwa'
             'daxian-dbw'
             'PaulHigin'
-            'rjmholt'
+            'SeeminglyScience'
             'SteveL-MSFT'
-            'TylerLeonhardt'
+            'StevenBucher98'
+            'SydneyhSmith'
         )
 
         $IssueEmojis = @{
@@ -81,7 +82,7 @@ function Get-Bullets {
             'Area-Documentation'        = '📖'
             'Area-Engine'               = '🚂'
             'Area-Folding'              = '📚'
-            'Area-Integrated Console'   = '📟'
+            'Area-Extension Terminal'   = '📟'
             'Area-IntelliSense'         = '🧠'
             'Area-Logging'              = '💭'
             'Area-Pester'               = '🐢'
@@ -251,7 +252,7 @@ function Update-Changelog {
                 ""
                 $Bullets
                 ""
-                "#### [PowerShellEditorServices](https://github.com/PowerShell/PowerShellEditorServices)"
+                "#### [PowerShellEditorServices](https://github.com/PowerShell/PowerShellEditorServices) v$(Get-Version -RepositoryName PowerShellEditorServices)"
                 ""
                 (Get-FirstChangelog -RepositoryName "PowerShellEditorServices").Where({ $_.StartsWith("- ") }, "SkipUntil")
             )
@@ -390,7 +391,7 @@ function New-ReleasePR {
     Use-Repository -RepositoryName $RepositoryName -Script {
         if ($PSCmdlet.ShouldProcess("$RepositoryName/release", "git push")) {
             Write-Host "Pushing release branch..."
-            git push --set-upstream --force-with-lease origin release
+            git push --force-with-lease origin release
         }
     }
 
@@ -398,7 +399,7 @@ function New-ReleasePR {
 
     $Params = @{
         Head  = "release"
-        Base  = "master"
+        Base  = "main"
         Draft = $true
         Title = "Release ``v$Version``"
         Body  = "Automated PR for new release!"
@@ -415,7 +416,7 @@ function New-ReleasePR {
 
 <#
 .SYNOPSIS
-  Kicks off the whole release process.
+  Kicks off the whole release process for one of the repositories.
 .DESCRIPTION
   This first updates the changelog (which creates and checks out the `release`
   branch), commits the changes, updates the version (and commits), pushes the
@@ -434,6 +435,29 @@ function New-Release {
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)]
+        [ValidateSet([RepoNames])]
+        [string]$RepositoryName,
+
+        [Parameter(Mandatory)]
+        [ValidateScript({ $_.StartsWith("v") })]
+        [string]$Version
+    )
+    # TODO: Automate rolling a preview to a stable release.
+    Update-Changelog -RepositoryName $RepositoryName -Version $Version
+    Update-Version -RepositoryName $RepositoryName
+    New-ReleasePR -RepositoryName $RepositoryName
+}
+
+<#
+.SYNOPSIS
+  Kicks off the whole release process for both repositories.
+.DESCRIPTION
+  This just simplifies the calling of `New-Release` for both repositories.
+#>
+function New-ReleaseBundle {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory)]
         [ValidateScript({ $_.StartsWith("v") })]
         [string]$PsesVersion,
 
@@ -446,9 +470,7 @@ function New-Release {
             "PowerShellEditorServices" { $PsesVersion }
             "vscode-powershell" { $VsceVersion }
         }
-        Update-Changelog -RepositoryName $_ -Version $Version
-        Update-Version -RepositoryName $_
-        New-ReleasePR -RepositoryName $_
+        New-Release -RepositoryName $_ -Version $Version
     }
 }
 

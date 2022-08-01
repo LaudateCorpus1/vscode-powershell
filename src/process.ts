@@ -1,19 +1,19 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import cp = require("child_process");
 import fs = require("fs");
-import net = require("net");
-import os = require("os");
+import cp = require("child_process");
+import * as semver from "semver";
 import path = require("path");
 import vscode = require("vscode");
 import { Logger } from "./logging";
 import Settings = require("./settings");
 import utils = require("./utils");
+import { IEditorServicesSessionDetails, SessionManager } from "./session";
 
 export class PowerShellProcess {
-    public static escapeSingleQuotes(pspath: string): string {
-        return pspath.replace(new RegExp("'", "g"), "''");
+    public static escapeSingleQuotes(psPath: string): string {
+        return psPath.replace(new RegExp("'", "g"), "''");
     }
 
     // This is used to warn the user that the extension is taking longer than expected to startup.
@@ -32,13 +32,13 @@ export class PowerShellProcess {
         private title: string,
         private log: Logger,
         private startPsesArgs: string,
-        private sessionFilePath: string,
+        private sessionFilePath: vscode.Uri,
         private sessionSettings: Settings.ISettings) {
 
         this.onExited = this.onExitedEmitter.event;
     }
 
-    public async start(logFileName: string): Promise<utils.IEditorServicesSessionDetails> {
+    public async start(logFileName: string): Promise<IEditorServicesSessionDetails> {
         const editorServicesLogPath = this.log.getLogFilePath(logFileName);
 
         const psesModulePath =
@@ -53,8 +53,8 @@ export class PowerShellProcess {
                 : "";
 
         this.startPsesArgs +=
-            `-LogPath '${PowerShellProcess.escapeSingleQuotes(editorServicesLogPath)}' ` +
-            `-SessionDetailsPath '${PowerShellProcess.escapeSingleQuotes(this.sessionFilePath)}' ` +
+            `-LogPath '${PowerShellProcess.escapeSingleQuotes(editorServicesLogPath.fsPath)}' ` +
+        `-SessionDetailsPath '${PowerShellProcess.escapeSingleQuotes(this.sessionFilePath.fsPath)}' ` +
             `-FeatureFlags @(${featureFlags}) `;
 
         if (this.sessionSettings.integratedConsole.useLegacyReadLine) {
@@ -101,23 +101,29 @@ export class PowerShellProcess {
             "    PowerShell Editor Services args: " + startEditorServices);
 
         // Make sure no old session file exists
-        utils.deleteSessionFile(this.sessionFilePath);
+        await PowerShellProcess.deleteSessionFile(this.sessionFilePath);
 
         // Launch PowerShell in the integrated terminal
-        this.consoleTerminal =
-            vscode.window.createTerminal({
-                name: this.title,
-                shellPath: this.exePath,
-                shellArgs: powerShellArgs,
-                hideFromUser: !this.sessionSettings.integratedConsole.showOnStartup,
-                cwd: this.sessionSettings.cwd
-            });
+        const terminalOptions: vscode.TerminalOptions = {
+            name: this.title,
+            shellPath: this.exePath,
+            shellArgs: powerShellArgs,
+            cwd: this.sessionSettings.cwd,
+            iconPath: new vscode.ThemeIcon("terminal-powershell"),
+        };
+
+        if (semver.gte(vscode.version, "1.65.0")) {
+            // @ts-ignore TODO: Don't ignore after we update our engine.
+            terminalOptions.isTransient = true;
+        }
+
+        this.consoleTerminal = vscode.window.createTerminal(terminalOptions);
 
         const pwshName = path.basename(this.exePath);
         this.log.write(`${pwshName} started.`);
 
         if (this.sessionSettings.integratedConsole.showOnStartup) {
-            // We still need to run this to set the active terminal to the Integrated Console.
+            // We still need to run this to set the active terminal to the extension terminal.
             this.consoleTerminal.show(true);
         }
 
@@ -143,9 +149,8 @@ export class PowerShellProcess {
     }
 
     public dispose() {
-
         // Clean up the session file
-        utils.deleteSessionFile(this.sessionFilePath);
+        PowerShellProcess.deleteSessionFile(this.sessionFilePath);
 
         if (this.consoleCloseSubscription) {
             this.consoleCloseSubscription.dispose();
@@ -157,6 +162,14 @@ export class PowerShellProcess {
             this.consoleTerminal.dispose();
             this.consoleTerminal = undefined;
         }
+    }
+
+    public sendKeyPress() {
+        // NOTE: This is a regular character instead of something like \0
+        // because non-printing characters can cause havoc with different
+        // languages and terminal settings. We discard the character server-side
+        // anyway, so it doesn't matter what we send.
+        this.consoleTerminal.sendText("p", false);
     }
 
     private logTerminalPid(pid: number, exeName: string) {
@@ -177,17 +190,31 @@ export class PowerShellProcess {
         return true;
     }
 
-    private async waitForSessionFile(): Promise<utils.IEditorServicesSessionDetails> {
+    private static readSessionFile(sessionFilePath: vscode.Uri): IEditorServicesSessionDetails {
+        // TODO: Use vscode.workspace.fs.readFile instead of fs.readFileSync.
+        const fileContents = fs.readFileSync(sessionFilePath.fsPath, "utf-8");
+        return JSON.parse(fileContents);
+    }
+
+    private static async deleteSessionFile(sessionFilePath: vscode.Uri) {
+        try {
+            await vscode.workspace.fs.delete(sessionFilePath);
+        } catch (e) {
+            // TODO: Be more specific about what we're catching
+        }
+    }
+
+    private async waitForSessionFile(): Promise<IEditorServicesSessionDetails> {
         // Determine how many tries by dividing by 2000 thus checking every 2 seconds.
         const numOfTries = this.sessionSettings.developer.waitForSessionFileTimeoutSeconds / 2;
         const warnAt = numOfTries - PowerShellProcess.warnUserThreshold;
 
         // Check every 2 seconds
         for (let i = numOfTries; i > 0; i--) {
-            if (utils.checkIfFileExists(this.sessionFilePath)) {
+            if (utils.checkIfFileExists(this.sessionFilePath.fsPath)) {
                 this.log.write("Session file found");
-                const sessionDetails = utils.readSessionFile(this.sessionFilePath);
-                utils.deleteSessionFile(this.sessionFilePath);
+                const sessionDetails = PowerShellProcess.readSessionFile(this.sessionFilePath);
+                PowerShellProcess.deleteSessionFile(this.sessionFilePath);
                 return sessionDetails;
             }
 
