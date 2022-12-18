@@ -1,11 +1,10 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import * as path from "path";
 import vscode = require("vscode");
 import { SessionManager } from "../session";
-import Settings = require("../settings");
-import utils = require("../utils");
+import { ILogger } from "../logging";
+import { getSettings, chosenWorkspace, validateCwdSetting } from "../settings";
 
 enum LaunchType {
     Debug,
@@ -13,14 +12,13 @@ enum LaunchType {
 }
 
 export class RunCodeFeature implements vscode.Disposable {
-
     private command: vscode.Disposable;
 
-    constructor(private sessionManager: SessionManager) {
+    constructor(private sessionManager: SessionManager, private logger: ILogger) {
         this.command = vscode.commands.registerCommand(
             "PowerShell.RunCode",
-            (runInDebugger: boolean, scriptToRun: string, args: string[]) => {
-                this.launchTask(runInDebugger, scriptToRun, args);
+            async (runInDebugger: boolean, scriptToRun: string, args: string[]) => {
+                await this.launchTask(runInDebugger, scriptToRun, args);
             });
     }
 
@@ -41,33 +39,25 @@ export class RunCodeFeature implements vscode.Disposable {
     private async launch(launchConfig: string | vscode.DebugConfiguration) {
         // Create or show the interactive console
         // TODO: #367: Check if "newSession" mode is configured
-        await vscode.commands.executeCommand("PowerShell.ShowSessionConsole", true);
+        this.sessionManager.showDebugTerminal(true);
 
-        // TODO: Update to handle multiple root workspaces.
-        await vscode.debug.startDebugging(vscode.workspace.workspaceFolders?.[0], launchConfig);
+        await validateCwdSetting(this.logger);
+        await vscode.debug.startDebugging(chosenWorkspace, launchConfig);
     }
 }
 
 function createLaunchConfig(launchType: LaunchType, commandToRun: string, args: string[]) {
-    const settings = Settings.load();
-
-    let cwd: string = vscode.workspace.rootPath;
-    if (vscode.window.activeTextEditor
-        && vscode.window.activeTextEditor.document
-        && !vscode.window.activeTextEditor.document.isUntitled) {
-        cwd = path.dirname(vscode.window.activeTextEditor.document.fileName);
-    }
+    const settings = getSettings();
 
     const launchConfig = {
         request: "launch",
         type: "PowerShell",
-        name: "PowerShell Run Code",
+        name: "PowerShell: Run Code",
         internalConsoleOptions: "neverOpen",
         noDebug: (launchType === LaunchType.Run),
         createTemporaryIntegratedConsole: settings.debugging.createTemporaryIntegratedConsole,
         script: commandToRun,
         args,
-        cwd,
     };
 
     return launchConfig;

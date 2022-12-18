@@ -2,9 +2,9 @@
 // Licensed under the MIT License.
 
 import * as vscode from "vscode";
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
 import { LanguageClientConsumer } from "../languageClientConsumer";
-import { Logger } from "../logging";
+import { ILogger } from "../logging";
 import { SessionManager } from "../session";
 
 export interface IExternalPowerShellDetails {
@@ -39,7 +39,7 @@ export class ExternalApiFeature extends LanguageClientConsumer implements IPower
     constructor(
         private extensionContext: vscode.ExtensionContext,
         private sessionManager: SessionManager,
-        private log: Logger) {
+        private logger: ILogger) {
         super();
     }
 
@@ -56,13 +56,14 @@ export class ExternalApiFeature extends LanguageClientConsumer implements IPower
     RETURNS:
         string session uuid
     */
-    public registerExternalExtension(id: string, apiVersion: string = 'v1'): string {
-        this.log.writeDiagnostic(`Registering extension '${id}' for use with API version '${apiVersion}'.`);
+    public registerExternalExtension(id: string, apiVersion = "v1"): string {
+        this.logger.writeDiagnostic(`Registering extension '${id}' for use with API version '${apiVersion}'.`);
 
-        for (const [_, externalExtension] of ExternalApiFeature.registeredExternalExtension) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for (const [_name, externalExtension] of ExternalApiFeature.registeredExternalExtension) {
             if (externalExtension.id === id) {
                 const message = `The extension '${id}' is already registered.`;
-                this.log.writeWarning(message);
+                this.logger.writeWarning(message);
                 throw new Error(message);
             }
         }
@@ -97,22 +98,22 @@ export class ExternalApiFeature extends LanguageClientConsumer implements IPower
     RETURNS:
         true if it worked, otherwise throws an error.
     */
-    public unregisterExternalExtension(uuid: string = ""): boolean {
-        this.log.writeDiagnostic(`Unregistering extension with session UUID: ${uuid}`);
+    public unregisterExternalExtension(uuid = ""): boolean {
+        this.logger.writeDiagnostic(`Unregistering extension with session UUID: ${uuid}`);
         if (!ExternalApiFeature.registeredExternalExtension.delete(uuid)) {
             throw new Error(`No extension registered with session UUID: ${uuid}`);
         }
         return true;
     }
 
-    private getRegisteredExtension(uuid: string = ""): IExternalExtension {
+    private getRegisteredExtension(uuid = ""): IExternalExtension {
         if (!ExternalApiFeature.registeredExternalExtension.has(uuid)) {
             throw new Error(
                 "UUID provided was invalid, make sure you ran the 'powershellExtensionClient.registerExternalExtension(extensionId)' method and pass in the UUID that it returns to subsequent methods.");
         }
 
         // TODO: When we have more than one API version, make sure to include a check here.
-        return ExternalApiFeature.registeredExternalExtension.get(uuid);
+        return ExternalApiFeature.registeredExternalExtension.get(uuid)!;
     }
 
     /*
@@ -133,18 +134,18 @@ export class ExternalApiFeature extends LanguageClientConsumer implements IPower
             architecture: string;
         }
     */
-    public async getPowerShellVersionDetails(uuid: string = ""): Promise<IExternalPowerShellDetails> {
+    public async getPowerShellVersionDetails(uuid = ""): Promise<IExternalPowerShellDetails> {
         const extension = this.getRegisteredExtension(uuid);
-        this.log.writeDiagnostic(`Extension '${extension.id}' called 'getPowerShellVersionDetails'`);
+        this.logger.writeDiagnostic(`Extension '${extension.id}' called 'getPowerShellVersionDetails'`);
 
         await this.sessionManager.waitUntilStarted();
         const versionDetails = this.sessionManager.getPowerShellVersionDetails();
 
         return {
-            exePath: this.sessionManager.PowerShellExeDetails.exePath,
-            version: versionDetails.version,
-            displayName: this.sessionManager.PowerShellExeDetails.displayName, // comes from the Session Menu
-            architecture: versionDetails.architecture
+            exePath: this.sessionManager.PowerShellExeDetails?.exePath ?? "unknown",
+            version: versionDetails?.version ?? "unknown",
+            displayName: this.sessionManager.PowerShellExeDetails?.displayName ?? "unknown", // comes from the Session Menu
+            architecture: versionDetails?.architecture ?? "unknown"
         };
     }
     /*
@@ -161,14 +162,16 @@ export class ExternalApiFeature extends LanguageClientConsumer implements IPower
         If the extension is not started by some mechanism
         then this will wait indefinitely.
     */
-    public async waitUntilStarted(uuid: string = ""): Promise<void> {
+    public async waitUntilStarted(uuid = ""): Promise<void> {
         const extension = this.getRegisteredExtension(uuid);
-        this.log.writeDiagnostic(`Extension '${extension.id}' called 'waitUntilStarted'`);
-        return this.sessionManager.waitUntilStarted();
+        this.logger.writeDiagnostic(`Extension '${extension.id}' called 'waitUntilStarted'`);
+        await this.sessionManager.waitUntilStarted();
     }
 
     public getStorageUri(): vscode.Uri {
-        return this.extensionContext.globalStorageUri;
+        // We have to override the scheme because it defaults to
+        // 'vscode-userdata' which breaks UNC paths.
+        return this.extensionContext.globalStorageUri.with({ scheme: "file"});
     }
 
     public dispose() {

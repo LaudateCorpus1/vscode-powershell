@@ -94,7 +94,7 @@
       "do {",
       "\t${0:$TM_SELECTED_TEXT}",
       "} while (",
-      "\t${1:<# Condition that stops the loop if it returns false #>})",
+      "\t${1:<# Condition that stops the loop if it returns false #>}",
       ")"
     ]
   },
@@ -203,7 +203,7 @@
       "\t${6:Explanation of the function or its result. You can include multiple examples with additional .EXAMPLE lines}",
       "#>",
       "",
-      "{0}"
+      "${0:$TM_SELECTED_TEXT}"
     ]
   },
   "Function-Advanced": {
@@ -606,7 +606,7 @@
       "\t${0:$TM_SELECTED_TEXT}",
       "}",
       "catch {",
-      "\t{1:<#Do this if a terminating exception happens#>}",
+      "\t${1:<#Do this if a terminating exception happens#>}",
       "}"
     ]
   },

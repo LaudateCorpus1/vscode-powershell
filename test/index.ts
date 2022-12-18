@@ -31,7 +31,9 @@ export function run(): Promise<void> {
             }
 
             // Add files to the test suite
-            files.forEach(f => mocha.addFile(path.resolve(__dirname, f)));
+            for (const file of files) {
+                mocha.addFile(path.resolve(__dirname, file));
+            }
 
             try {
                 // Run the mocha test
@@ -43,7 +45,6 @@ export function run(): Promise<void> {
                     }
                 });
             } catch (err) {
-                // tslint:disable-next-line:no-console
                 console.error(err);
                 e(err);
             }
